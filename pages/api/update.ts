@@ -17,7 +17,7 @@ const handler: NextApiHandler = async (req, res) => {
   }
   try {
     const url = req.body.github;
-    const selector = ".ContributionCalendardddd";
+    const selector = ".ContributionCalendar";
     const screenshotPath = "results/screenshot.png";
 
     const browser = await runBrowser();
