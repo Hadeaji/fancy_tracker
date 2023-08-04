@@ -1,8 +1,4 @@
-import {
-  githubProgress,
-  resizePhoto,
-  updateLinkedin,
-} from "@/utiles/functions";
+import { cronLinkedin, updateLinkedin } from "@/utiles/functions";
 import type { NextApiHandler, NextApiRequest, NextApiResponse } from "next";
 import puppeteer from "puppeteer-core";
 
@@ -16,27 +12,16 @@ const handler: NextApiHandler = async (req, res) => {
     return;
   }
   try {
-    // console.log("req.body --------->", req.body);
-    const url = req.body.github;
-    // console.log("Received url:", url);
-    const selector = ".ContributionCalendar"; // Replace with the CSS selector of the desired element
-    const screenshotPath = "results/screenshot.png"; // Specify the desired file path for the screenshot
-
-    // get progress from GH and return image
+    const { linkedinPass, linkedinEmail, verification } = req.body;
+    // console.log("Received body:", req.body);
     const browser = await runBrowser();
 
-    await githubProgress(browser, url, selector, screenshotPath);
-    console.log("Screenshot captured and saved to:", screenshotPath);
-    // await browser.close();
+    const results = await updateLinkedin(browser, linkedinPass, linkedinEmail, verification);
+    if (results === 400) {
+      res.status(400).send({ message: "Failed" });
 
-    // send image to resize function and choose where to be saved
-    const outputImagePath = "results/screenshotmoded.png";
-    await resizePhoto(screenshotPath, outputImagePath);
-    //
-
-    res
-      .status(200)
-      .send({ message: "Screenshot captured and processed successfully" });
+    }
+    res.status(200).send({ message: "Success" });
   } catch (error: unknown) {
     console.log(error);
     const errorMessage = "An error occurred while getting screenshot";
@@ -57,7 +42,6 @@ async function runBrowser() {
       browserWSEndpoint: `wss://chrome.browserless.io?token=${process.env.BLESS_TOKEN}`,
     });
   }
-  // console.log("ran once", new Date());
   return browser;
 }
 
