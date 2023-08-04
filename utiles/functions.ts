@@ -9,6 +9,12 @@ async function waitForElementRemoval(page: Page, elementSelector: string) {
     elementSelector
   );
 }
+function validator(status: string, message: string) {
+  return {
+    status,
+    message
+  }
+}
 
 // async function clickOnEitherSelector(page: Page, selector1: string, selector2: string) {
 //   // Create a race between the two promises
@@ -74,7 +80,13 @@ export async function githubProgress(
   await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
 
   await page.goto(url);
-  await page.waitForSelector(selector);
+  //TODO: try-catch
+  try {
+    await page.waitForSelector(selector);
+
+  } catch (error) {
+    return validator("githubSelector", "selector not found")
+  }
 
   const boundingBox = await page.evaluate((selector) => {
     const element = document.querySelector(selector);
@@ -86,15 +98,21 @@ export async function githubProgress(
     width += 5;
     return { x, y, width, height };
   }, selector);
-
-  if (!boundingBox) {
-    throw new Error('Element was not found');
+  //TODO: try-catch
+  try {
+    // if (!boundingBox) {
+    //   throw new Error('Element was not found');
+    // }
+    await page.screenshot({
+      path: screenshotPath,
+      clip: boundingBox as BoundingBox,
+    });
+  } catch (error) {
+    validator("boundingBox", "bounding Box is wrong")
   }
+  //TODO: return valid 
 
-  await page.screenshot({
-    path: screenshotPath,
-    clip: boundingBox as BoundingBox,
-  });
+  return validator("githubProgress", "github Progress completed")
 }
 
 export async function updateLinkedin(
@@ -119,6 +137,7 @@ export async function updateLinkedin(
   const submitSelector = "button[type=submit]";
   const _2FASelector = ".input_verification_pin";
 
+  //TODO: try-catch
   const emailInput = await page.waitForSelector(emailSelector);
   if (emailInput) {
     for (const char of linkedinEmail) {
@@ -126,6 +145,7 @@ export async function updateLinkedin(
     }
   }
 
+  //TODO: try-catch
   const passwordInput = await page.waitForSelector(passwordSelector);
   if (passwordInput) {
     for (const char of linkedinPass) {
@@ -144,6 +164,7 @@ export async function updateLinkedin(
     }
 
   } catch (error: unknown) {
+    //TODO: return obg {status, msg}
     console.log(error);
   }
 

@@ -3,7 +3,7 @@ import {
   resizePhoto,
   updateLinkedin,
 } from "@/utiles/functions";
-import type { NextApiHandler, NextApiRequest, NextApiResponse } from "next";
+import type { NextApiHandler } from "next";
 import puppeteer from "puppeteer-core";
 
 type Json = {
@@ -16,27 +16,28 @@ const handler: NextApiHandler = async (req, res) => {
     return;
   }
   try {
-    // console.log("req.body --------->", req.body);
     const url = req.body.github;
-    // console.log("Received url:", url);
-    const selector = ".ContributionCalendar"; // Replace with the CSS selector of the desired element
-    const screenshotPath = "results/screenshot.png"; // Specify the desired file path for the screenshot
+    const selector = ".ContributionCalendardddd";
+    const screenshotPath = "results/screenshot.png";
 
-    // get progress from GH and return image
     const browser = await runBrowser();
 
-    await githubProgress(browser, url, selector, screenshotPath);
-    console.log("Screenshot captured and saved to:", screenshotPath);
-    // await browser.close();
+    const res1 = await githubProgress(browser, url, selector, screenshotPath);
+    console.log("=======================", res1);
+    if (res1.status == "githubSelector") {
+      return res
+        .status(404)
+        .send({ message: "githubSelector not found" });
+    } else {
+      console.log("Screenshot captured and saved to:", screenshotPath);
+      // await browser.close();
+      const outputImagePath = "results/screenshotmoded.png";
+      await resizePhoto(screenshotPath, outputImagePath);
+      res
+        .status(200)
+        .send({ message: "Screenshot captured and processed successfully" });
+    }
 
-    // send image to resize function and choose where to be saved
-    const outputImagePath = "results/screenshotmoded.png";
-    await resizePhoto(screenshotPath, outputImagePath);
-    //
-
-    res
-      .status(200)
-      .send({ message: "Screenshot captured and processed successfully" });
   } catch (error: unknown) {
     console.log(error);
     const errorMessage = "An error occurred while getting screenshot";
