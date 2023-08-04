@@ -1,7 +1,32 @@
-import { Browser, ScreenshotOptions, BoundingBox } from "puppeteer-core";
+import { Browser, BoundingBox, FileChooser, ElementHandle, Dialog, Page } from "puppeteer-core";
 import sharp from "sharp";
 import fs from "fs";
-import crypto from "crypto";
+
+async function waitForElementRemoval(page: Page, elementSelector: string) {
+  await page.waitForFunction(
+    (selector) => !document.querySelector(selector),
+    {},
+    elementSelector
+  );
+}
+
+// async function clickOnEitherSelector(page: Page, selector1: string, selector2: string) {
+//   // Create a race between the two promises
+//   const racePromise = Promise.race([
+//     page.waitForSelector(selector1),
+//     page.waitForSelector(selector2),
+//   ]);
+
+//   // Wait for either selector to become available
+//   const elementHandle = await racePromise;
+
+//   if (elementHandle) {
+//     // Click on the element that became available first
+//     await elementHandle.click();
+//   } else {
+//     throw new Error('Neither selector was found on the page.');
+//   }
+// }
 
 export function resizePhoto(inputImagePath: string, outputImagePath: string) {
   const imageWidth = 1584;
@@ -44,30 +69,32 @@ export async function githubProgress(
   screenshotPath: string
 ) {
   const page = await browser.newPage();
-  await page.setViewport({ width: 1920, height: 1280, deviceScaleFactor: 2 });
+  await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 2 });
 
-  await page.emulateMediaFeatures([
-    { name: "prefers-color-scheme", value: "dark" },
-  ]);
+  await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'dark' }]);
 
   await page.goto(url);
   await page.waitForSelector(selector);
 
-  const elementHandle = await page.$(selector);
-  if (!elementHandle) {
-    throw new Error(`Element was not found`);
+  const boundingBox = await page.evaluate((selector) => {
+    const element = document.querySelector(selector);
+    if (!element) {
+      return null;
+    }
+
+    let { x, y, width, height } = element.getBoundingClientRect();
+    width += 5;
+    return { x, y, width, height };
+  }, selector);
+
+  if (!boundingBox) {
+    throw new Error('Element was not found');
   }
 
-  const boundingBox = await elementHandle.boundingBox();
-  const screenshotOptions: ScreenshotOptions & { clip?: BoundingBox } = {
+  await page.screenshot({
     path: screenshotPath,
-  };
-
-  if (boundingBox) {
-    screenshotOptions.clip = boundingBox;
-  }
-
-  await page.screenshot(screenshotOptions);
+    clip: boundingBox as BoundingBox,
+  });
 }
 
 export async function updateLinkedin(
@@ -105,38 +132,44 @@ export async function updateLinkedin(
       await passwordInput.type(char, { delay: Math.random() * 100 + 50 });
     }
   }
-
   await page.click(submitSelector);
 
-  const _2FAInput = await page.waitForSelector(_2FASelector);
-  if (_2FAInput) {
-    for (const char of _2FA) {
-      await _2FAInput.type(char, { delay: Math.random() * 100 + 50 });
+  try {
+    const _2FAInput = await page.waitForSelector(_2FASelector, { timeout: 5000 });
+    if (_2FAInput) {
+      for (const char of _2FA) {
+        await _2FAInput.type(char, { delay: Math.random() * 100 + 50 });
+      }
+      await page.click(submitSelector);
     }
+
+  } catch (error: unknown) {
+    console.log(error);
   }
 
-  await page.click(submitSelector);
+  await page.goto(feedUrl);
+  const profileSelector = ".feed-identity-module__actor-meta a";
+  try {
+    await page.waitForSelector(profileSelector);
+  } catch (error: unknown) {
+    return 400;
+  }
+  await page.click(profileSelector);
+
+  const editBtnSelector = ".profile-topcard-background-image-edit__icon button";
+  await page.waitForSelector(editBtnSelector);
+  await page.click(editBtnSelector);
+
+  await uploadFileToField(page);
+  await waitForElementRemoval(page, ".artdeco-modal-overlay");
+  await browser.close();
 
   // Get the cookies
-  const cookies = await page.cookies();
-
-  // Create a new object to store cookies along with additional data (encrypted password)
-  const dataToSave = {
-    linkedinEmail: linkedinEmail,
-    linkedinPass: linkedinPass, // Encrypt the password before saving
-    cookies: cookies,
-  };
-
-  // Save the data to 'cookies.json' file
-  fs.writeFileSync("cookies.json", JSON.stringify(dataToSave, null, 2));
-
-  // navigate to feed
-  // await page.goto(feedUrl);
-  // // click on global-nav__primary-link-me-menu-trigger
-  // const feedSelector = ".global-nav__primary-link-me-menu-trigger";
-  // await page.waitForSelector(feedSelector);
-
-  // await page.click(feedSelector);
+  // const cookies = await page.cookies();
+  // const dataToSave = {
+  //   cookies: cookies,
+  // };
+  // fs.writeFileSync("cookies.json", JSON.stringify(dataToSave, null, 2));
 }
 
 export async function cronLinkedin(browser: Browser) {
@@ -157,28 +190,38 @@ export async function cronLinkedin(browser: Browser) {
   // await browser.close();
 }
 
-// function encrypt(text: string): string {
-//   const iv = crypto.randomBytes(16);
-//   const cipher = crypto.createCipheriv(
-//     "aes-256-cbc",
-//     Buffer.from("ENCRYPTION_KEY"),
-//     iv
-//   );
-//   let encrypted = cipher.update(text, "utf8", "hex");
-//   encrypted += cipher.final("hex");
-//   return iv.toString("hex") + ":" + encrypted;
-// }
+export async function uploadFileToField(
+  page: Page,
+) {
+  const fileToUpload = 'results/screenshotmoded.png';
+  const fileInputSelector = '#background-image-cropper__file-upload-input';
+  const apply = ".image-edit-tool-footer .artdeco-button--primary";
 
-// function decrypt(encryptedText: string): string {
-//   const parts = encryptedText.split(":");
-//   const iv = Buffer.from(parts[0], "hex");
-//   const encrypted = parts[1];
-//   const decipher = crypto.createDecipheriv(
-//     "aes-256-cbc",
-//     Buffer.from("ENCRYPTION_KEY"),
-//     iv
-//   );
-//   let decrypted = decipher.update(encrypted, "hex", "utf8");
-//   decrypted += decipher.final("utf8");
-//   return decrypted;
-// }
+  // Navigate to the page with the file input field
+  await page.waitForSelector(fileInputSelector);
+
+  // Set the file input value to the file path
+  const fileInputElement = (await page.$(fileInputSelector)) as ElementHandle<HTMLInputElement>;
+  if (!fileInputElement) {
+    throw new Error('File input element was not found');
+  }
+
+  await page.evaluate((selector, className) => {
+    const element = document.querySelector(selector);
+    if (element) {
+      element.classList.remove(className);
+    }
+  }, fileInputSelector, 'hidden');
+
+  await fileInputElement.uploadFile(fileToUpload);
+
+  // Listen for the 'dialog' event to handle the file chooser
+  page.on('dialog', async (dialog: Dialog) => {
+    await dialog.accept(fileToUpload);
+  });
+
+  await page.waitForSelector("#background-image-cropper__file-upload-input.hidden");
+  await page.waitForSelector(apply, { visible: true, });
+
+  await page.click(apply);
+}

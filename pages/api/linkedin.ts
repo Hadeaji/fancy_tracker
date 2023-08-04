@@ -16,8 +16,12 @@ const handler: NextApiHandler = async (req, res) => {
     // console.log("Received body:", req.body);
     const browser = await runBrowser();
 
-    await updateLinkedin(browser, linkedinPass, linkedinEmail, verification);
-    res.status(200).send({ message: "successfully" });
+    const results = await updateLinkedin(browser, linkedinPass, linkedinEmail, verification);
+    if (results === 400) {
+      res.status(400).send({ message: "Failed" });
+
+    }
+    res.status(200).send({ message: "Success" });
   } catch (error: unknown) {
     console.log(error);
     const errorMessage = "An error occurred while getting screenshot";
